@@ -155,8 +155,36 @@ app.delete('/messages/:id', (req, res) => {
 		});
 });
 
-// app.put('/messages/:id', (req, res) => {
-// 	console.log('put Messages');
-// });
+app.put('/messages/:id', (req, res) => {
+	const { to, text, type } = req.body;
+	const { id } = req.params;
+	const user = cleanStringData(req.headers.user);
+
+	messages
+		.find({ _id: ObjectId(id) })
+		.toArray()
+		.then((messagesArray) => {
+			if (messagesArray.length === 0) {
+				res.sendStatus(404);
+			} else if (messagesArray[0].from !== user) {
+				res.sendStatus(401);
+			} else {
+				messages
+					.updateOne(
+						{ _id: ObjectId(id) },
+						{
+							$set: {
+								to: cleanStringData(to),
+								text: cleanStringData(text),
+								type: cleanStringData(type),
+							},
+						}
+					)
+					.then(() => {
+						res.sendStatus(200);
+					});
+			}
+		});
+});
 
 app.listen(process.env.PORT, () => console.log('Running server on http://localhost:5000'));
