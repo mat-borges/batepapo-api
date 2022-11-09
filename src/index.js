@@ -51,12 +51,27 @@ app.post('/participants', (req, res) => {
 
 app.get('/participants', (req, res) => {
 	//get participants from mongodb and return it to the user
-	console.log('get PARTICIPANTS');
+	participants
+		.find()
+		.toArray()
+		.then((participants) => {
+			res.status(200).send(participants);
+		});
 });
 
 app.post('/messages', (req, res) => {
-	console.log('post Messages');
-	res.sendStatus(201);
+	const { to, text, type } = req.body;
+	const message = {
+		from: req.headers.user,
+		to,
+		text,
+		type,
+		time: dayjs().format('HH:mm:ss'),
+	};
+
+	messages.insertOne(message).then(() => {
+		res.sendStatus(201);
+	});
 });
 
 app.get('/messages', (req, res) => {
