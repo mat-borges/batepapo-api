@@ -1,6 +1,6 @@
+import { MongoClient, ObjectID, ObjectId } from 'mongodb';
 import express, { json } from 'express';
 
-import { MongoClient } from 'mongodb';
 import cors from 'cors';
 import dayjs from 'dayjs';
 import dotenv from 'dotenv';
@@ -114,31 +114,46 @@ app.post('/status', (req, res) => {
 		});
 });
 
-// setInterval(() => {
-// 	participants
-// 		.find()
-// 		.toArray()
-// 		.then((usersArray) => {
-// 			const removeParticipants = usersArray.filter((p) => Date.now() - p.lastStatus >= 10000);
-// 			removeParticipants.forEach((e) => {
-// 				const id = e._id;
-// 				participants.deleteOne({ _id: id }).then(() => {
-// 					const message = {
-// 						from: e.name,
-// 						to: 'Todos',
-// 						text: 'sai da sala...',
-// 						type: 'status',
-// 						time: dayjs().format('HH:mm:ss'),
-// 					};
-// 					messages.insertOne(message);
-// 				});
-// 			});
-// 		});
-// }, 15000);
+setInterval(() => {
+	participants
+		.find()
+		.toArray()
+		.then((usersArray) => {
+			const removeParticipants = usersArray.filter((p) => Date.now() - p.lastStatus >= 10000);
+			removeParticipants.forEach((e) => {
+				const id = e._id;
+				participants.deleteOne({ _id: id }).then(() => {
+					const message = {
+						from: e.name,
+						to: 'Todos',
+						text: 'sai da sala...',
+						type: 'status',
+						time: dayjs().format('HH:mm:ss'),
+					};
+					messages.insertOne(message);
+				});
+			});
+		});
+}, 15000);
 
-// app.delete('/messages/:id', (req, res) => {
-// 	console.log('delete Messages');
-// });
+app.delete('/messages/:id', (req, res) => {
+	const user = cleanStringData(req.headers.user);
+	const { id } = req.params;
+	messages
+		.find({ _id: ObjectId(id) })
+		.toArray()
+		.then((messagesArray) => {
+			if (messagesArray.length === 0) {
+				res.sendStatus(404);
+			} else if (messagesArray[0].from !== user) {
+				res.sendStatus(401);
+			} else {
+				messages.deleteOne({ _id: ObjectId(id) }).then(() => {
+					res.sendStatus(200);
+				});
+			}
+		});
+});
 
 // app.put('/messages/:id', (req, res) => {
 // 	console.log('put Messages');
