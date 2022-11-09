@@ -97,15 +97,29 @@ app.get('/messages', (req, res) => {
 });
 
 app.post('/status', (req, res) => {
-	console.log('post Status');
+	const user = req.headers.user;
+
+	participants
+		.find({ name: user })
+		.toArray()
+		.then((participant) => {
+			if (participant.length === 0) {
+				res.sendStatus(404);
+			} else {
+				const id = participant[0]._id;
+				participants.updateOne({ _id: id }, { $set: { lastStatus: Date.now() } }).then(() => {
+					res.sendStatus(200);
+				});
+			}
+		});
 });
 
-app.delete('/messages/:id', (req, res) => {
-	console.log('delete Messages');
-});
+// app.delete('/messages/:id', (req, res) => {
+// 	console.log('delete Messages');
+// });
 
-app.put('/messages/:id', (req, res) => {
-	console.log('put Messages');
-});
+// app.put('/messages/:id', (req, res) => {
+// 	console.log('put Messages');
+// });
 
 app.listen(process.env.PORT, () => console.log('Running server on http://localhost:5000'));
