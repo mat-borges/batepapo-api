@@ -75,7 +75,25 @@ app.post('/messages', (req, res) => {
 });
 
 app.get('/messages', (req, res) => {
-	console.log('get Messages');
+	const limit = parseInt(req.query.limit);
+	const user = req.headers.user;
+
+	messages
+		.find()
+		.toArray()
+		.then((messages) => {
+			const userMessages = messages.filter((e) => {
+				if (e.to === 'Todos' || e.to === user || e.from === user) {
+					return true;
+				}
+			});
+			console.log(userMessages);
+			if (!limit) {
+				res.status(200).send(userMessages);
+			} else {
+				res.status(200).send(userMessages.slice(-limit));
+			}
+		});
 });
 
 app.post('/status', (req, res) => {
