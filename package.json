@@ -5,7 +5,7 @@
 	"description": "",
 	"main": "src/index.js",
 	"scripts": {
-		"dev":"nodemon src/index.js",
+		"dev": "nodemon src/index.js",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"repository": {
@@ -25,6 +25,7 @@
 		"dotenv": "^16.0.3",
 		"express": "^4.18.2",
 		"joi": "^17.7.0",
+		"mongodb": "^4.11.0",
 		"string-strip-html": "^11.6.20"
 	},
 	"devDependencies": {

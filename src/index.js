@@ -1,34 +1,52 @@
-import * as dotenv from 'dotenv';
+import express, { json } from 'express';
 
-import { strict as assert } from 'assert';
+import { MongoClient } from 'mongodb';
 import cors from 'cors';
 import dayjs from 'dayjs';
-import express from 'express';
-import { stripHtml } from 'string-strip-html';
+import dotenv from 'dotenv';
+
+// import { strict as assert } from 'assert';
+// import { stripHtml } from 'string-strip-html';
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(json());
+
+const mongoClient = new MongoClient(process.env.MONGO_URI);
+let db;
+let participants;
+let messages;
+
+mongoClient.connect().then(() => {
+	db = mongoClient.db('batepapoUolApi'); //O padrão é test
+	participants = db.collection('participants');
+	messages = db.collection('messages');
+});
 
 app.post('/participants', (req, res) => {
-	const { username: name } = req.body;
+	const { name: username } = req.body;
 	// this validation must be done with joi
 	if (!username) {
 		res.sendStatus(422);
 	}
-	// conditional checking if there's already an user with the same name
-	// the next infos must be saved using mongodb
+	// conditional checking if there's already an user with the same name using joi
 	const user = { name: `${username}`, lastStatus: Date.now() };
+
 	const message = {
 		from: `${username}`,
 		to: 'Todos',
 		text: 'entra na sala...',
 		type: 'status',
-		time: dayjs(user.lastStatus, 'HH:mm:ss'),
+		time: dayjs(user.lastStatus).format('HH:mm:ss'),
 	};
-	res.sendStatus(201);
+
+	participants.insertOne(user).then(() => {
+		messages.insertOne(message).then(() => {
+			res.sendStatus(201);
+		});
+	});
 });
 
 app.get('/participants', (req, res) => {
@@ -57,4 +75,4 @@ app.put('/messages/:id', (req, res) => {
 	console.log('put Messages');
 });
 
-app.listen(5000, () => console.log('Running server on http://localhost:5000'));
+app.listen(process.env.PORT, () => console.log('Running server on http://localhost:5000'));
