@@ -119,7 +119,6 @@ app.get('/messages', (req, res) => {
 					return true;
 				}
 			});
-			console.log(userMessages);
 			if (!limit) {
 				res.status(200).send(userMessages);
 			} else {
