@@ -114,6 +114,28 @@ app.post('/status', (req, res) => {
 		});
 });
 
+setInterval(() => {
+	participants
+		.find()
+		.toArray()
+		.then((usersArray) => {
+			const removeParticipants = usersArray.filter((p) => Date.now() - p.lastStatus >= 10000);
+			removeParticipants.forEach((e) => {
+				const id = e._id;
+				participants.deleteOne({ _id: id }).then(() => {
+					const message = {
+						from: e.name,
+						to: 'Todos',
+						text: 'sai da sala...',
+						type: 'status',
+						time: dayjs().format('HH:mm:ss'),
+					};
+					messages.insertOne(message);
+				});
+			});
+		});
+}, 15000);
+
 // app.delete('/messages/:id', (req, res) => {
 // 	console.log('delete Messages');
 // });
