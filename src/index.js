@@ -4,9 +4,7 @@ import { MongoClient } from 'mongodb';
 import cors from 'cors';
 import dayjs from 'dayjs';
 import dotenv from 'dotenv';
-
-// import { strict as assert } from 'assert';
-// import { stripHtml } from 'string-strip-html';
+import { stripHtml } from 'string-strip-html';
 
 dotenv.config();
 
@@ -18,6 +16,7 @@ const mongoClient = new MongoClient(process.env.MONGO_URI);
 let db;
 let participants;
 let messages;
+const cleanStringData = (string) => stripHtml(string).result.trim();
 
 mongoClient.connect().then(() => {
 	db = mongoClient.db('batepapoUolApi'); //O padrão é test
@@ -26,7 +25,8 @@ mongoClient.connect().then(() => {
 });
 
 app.post('/participants', (req, res) => {
-	const { name: username } = req.body;
+	const { name } = req.body;
+	const username = cleanStringData(name);
 	// this validation must be done with joi
 	if (!username) {
 		res.sendStatus(422);
@@ -62,10 +62,10 @@ app.get('/participants', (req, res) => {
 app.post('/messages', (req, res) => {
 	const { to, text, type } = req.body;
 	const message = {
-		from: req.headers.user,
-		to,
-		text,
-		type,
+		from: cleanStringData(req.headers.user),
+		to: cleanStringData(to),
+		text: cleanStringData(text),
+		type: cleanStringData(type),
 		time: dayjs().format('HH:mm:ss'),
 	};
 
@@ -76,7 +76,7 @@ app.post('/messages', (req, res) => {
 
 app.get('/messages', (req, res) => {
 	const limit = parseInt(req.query.limit);
-	const user = req.headers.user;
+	const user = cleanStringData(req.headers.user);
 
 	messages
 		.find()
@@ -97,7 +97,7 @@ app.get('/messages', (req, res) => {
 });
 
 app.post('/status', (req, res) => {
-	const user = req.headers.user;
+	const user = cleanStringData(req.headers.user);
 
 	participants
 		.find({ name: user })
@@ -114,27 +114,27 @@ app.post('/status', (req, res) => {
 		});
 });
 
-setInterval(() => {
-	participants
-		.find()
-		.toArray()
-		.then((usersArray) => {
-			const removeParticipants = usersArray.filter((p) => Date.now() - p.lastStatus >= 10000);
-			removeParticipants.forEach((e) => {
-				const id = e._id;
-				participants.deleteOne({ _id: id }).then(() => {
-					const message = {
-						from: e.name,
-						to: 'Todos',
-						text: 'sai da sala...',
-						type: 'status',
-						time: dayjs().format('HH:mm:ss'),
-					};
-					messages.insertOne(message);
-				});
-			});
-		});
-}, 15000);
+// setInterval(() => {
+// 	participants
+// 		.find()
+// 		.toArray()
+// 		.then((usersArray) => {
+// 			const removeParticipants = usersArray.filter((p) => Date.now() - p.lastStatus >= 10000);
+// 			removeParticipants.forEach((e) => {
+// 				const id = e._id;
+// 				participants.deleteOne({ _id: id }).then(() => {
+// 					const message = {
+// 						from: e.name,
+// 						to: 'Todos',
+// 						text: 'sai da sala...',
+// 						type: 'status',
+// 						time: dayjs().format('HH:mm:ss'),
+// 					};
+// 					messages.insertOne(message);
+// 				});
+// 			});
+// 		});
+// }, 15000);
 
 // app.delete('/messages/:id', (req, res) => {
 // 	console.log('delete Messages');
