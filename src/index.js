@@ -1,6 +1,7 @@
-import { MongoClient, ObjectID, ObjectId } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import express, { json } from 'express';
 
+import Joi from 'joi';
 import cors from 'cors';
 import dayjs from 'dayjs';
 import dotenv from 'dotenv';
@@ -19,38 +20,55 @@ let messages;
 const cleanStringData = (string) => stripHtml(string).result.trim();
 
 mongoClient.connect().then(() => {
-	db = mongoClient.db('batepapoUolApi'); //O padrão é test
+	db = mongoClient.db('batepapoUolApi');
 	participants = db.collection('participants');
 	messages = db.collection('messages');
 });
 
+const messageSchema = Joi.object({
+	from: Joi.string(),
+	to: Joi.string().min(1),
+	text: Joi.string().min(1),
+	type: Joi.string().valid('message', 'private-message'),
+	time: Joi.string(),
+});
+const participantSchema = Joi.object({ name: Joi.string().alphanum().min(1), lastStatus: Joi.number() });
+
 app.post('/participants', (req, res) => {
 	const { name } = req.body;
 	const username = cleanStringData(name);
-	// this validation must be done with joi
-	if (!username) {
-		res.sendStatus(422);
+
+	const { error, value: user } = participantSchema.validate({ name: `${username}`, lastStatus: Date.now() });
+
+	if (error) {
+		res.status(422).send(error.message);
+	} else {
+		const message = {
+			from: `${username}`,
+			to: 'Todos',
+			text: 'entra na sala...',
+			type: 'status',
+			time: dayjs(user.lastStatus).format('HH:mm:ss'),
+		};
+
+		participants
+			.find({ name: username })
+			.toArray()
+			.then((participant) => {
+				if (participant.length === 0) {
+					participants.insertOne(user).then(() => {
+						messages.insertOne(message).then(() => {
+							res.sendStatus(201);
+						});
+					});
+				} else {
+					res.status(409).send('A user with this username already exists');
+				}
+			});
 	}
-	// conditional checking if there's already an user with the same name using joi
-	const user = { name: `${username}`, lastStatus: Date.now() };
-
-	const message = {
-		from: `${username}`,
-		to: 'Todos',
-		text: 'entra na sala...',
-		type: 'status',
-		time: dayjs(user.lastStatus).format('HH:mm:ss'),
-	};
-
-	participants.insertOne(user).then(() => {
-		messages.insertOne(message).then(() => {
-			res.sendStatus(201);
-		});
-	});
 });
 
 app.get('/participants', (req, res) => {
-	//get participants from mongodb and return it to the user
 	participants
 		.find()
 		.toArray()
@@ -61,17 +79,31 @@ app.get('/participants', (req, res) => {
 
 app.post('/messages', (req, res) => {
 	const { to, text, type } = req.body;
-	const message = {
-		from: cleanStringData(req.headers.user),
+	const username = cleanStringData(req.headers.user);
+	const { error, value: message } = messageSchema.validate({
+		from: username,
 		to: cleanStringData(to),
 		text: cleanStringData(text),
 		type: cleanStringData(type),
 		time: dayjs().format('HH:mm:ss'),
-	};
-
-	messages.insertOne(message).then(() => {
-		res.sendStatus(201);
 	});
+
+	if (error) {
+		res.status(422).send(error.message);
+	} else {
+		participants
+			.find({ name: username })
+			.toArray()
+			.then((participant) => {
+				if (participant.length === 0) {
+					res.status(422).send("There's no user with this username");
+				} else {
+					messages.insertOne(message).then(() => {
+						res.sendStatus(201);
+					});
+				}
+			});
+	}
 });
 
 app.get('/messages', (req, res) => {
@@ -159,32 +191,46 @@ app.put('/messages/:id', (req, res) => {
 	const { to, text, type } = req.body;
 	const { id } = req.params;
 	const user = cleanStringData(req.headers.user);
+	const { error, value } = messageSchema.validate({ to, text, type });
 
-	messages
-		.find({ _id: ObjectId(id) })
-		.toArray()
-		.then((messagesArray) => {
-			if (messagesArray.length === 0) {
-				res.sendStatus(404);
-			} else if (messagesArray[0].from !== user) {
-				res.sendStatus(401);
-			} else {
-				messages
-					.updateOne(
-						{ _id: ObjectId(id) },
-						{
-							$set: {
-								to: cleanStringData(to),
-								text: cleanStringData(text),
-								type: cleanStringData(type),
-							},
-						}
-					)
-					.then(() => {
-						res.sendStatus(200);
-					});
-			}
-		});
+	if (error) {
+		res.status(422).send(error.message);
+	} else {
+		participants
+			.find({ name: user })
+			.toArray()
+			.then((participant) => {
+				if (participant.length === 0) {
+					res.status(422).send("There's no user with this username");
+				} else {
+					messages
+						.find({ _id: ObjectId(id) })
+						.toArray()
+						.then((messagesArray) => {
+							if (messagesArray.length === 0) {
+								res.sendStatus(404);
+							} else if (messagesArray[0].from !== user) {
+								res.sendStatus(401);
+							} else {
+								messages
+									.updateOne(
+										{ _id: ObjectId(id) },
+										{
+											$set: {
+												to: cleanStringData(to),
+												text: cleanStringData(text),
+												type: cleanStringData(type),
+											},
+										}
+									)
+									.then(() => {
+										res.sendStatus(200);
+									});
+							}
+						});
+				}
+			});
+	}
 });
 
-app.listen(process.env.PORT, () => console.log('Running server on http://localhost:5000'));
+app.listen(process.env.PORT, () => console.log(`Running server on http://localhost:${process.env.PORT}`));
