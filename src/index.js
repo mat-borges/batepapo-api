@@ -96,6 +96,7 @@ app.post('/messages', async (req, res) => {
 			type: cleanStringData(type),
 			time: dayjs().format('HH:mm:ss'),
 		});
+
 		if (error) {
 			res.status(422).send(error.message);
 		} else {
