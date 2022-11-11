@@ -138,6 +138,8 @@ app.get('/messages', async (req, res) => {
 		const userMessages = getMessages.filter((e) => {
 			if (e.to === 'Todos' || e.to === user || e.from === user || e.type === 'message') {
 				return true;
+			} else {
+				return false;
 			}
 		});
 
