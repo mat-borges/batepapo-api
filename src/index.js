@@ -171,26 +171,26 @@ app.post('/status', async (req, res) => {
 	}
 });
 
-// setInterval(async () => {
-// 	try {
-// 		const users = await participants.find().toArray();
-// 		const removeUsers = users.filter((p) => Date.now() - p.lastStatus >= 10000);
-// 		for (const e of removeUsers) {
-// 			const id = e._id;
-// 			await participants.deleteOne({ _id: id });
-// 			const message = {
-// 				from: e.name,
-// 				to: 'Todos',
-// 				text: 'sai da sala...',
-// 				type: 'status',
-// 				time: dayjs().format('HH:mm:ss'),
-// 			};
-// 			await messages.insertOne(message);
-// 		}
-// 	} catch (err) {
-// 		res.status(500).send({ message: err.message });
-// 	}
-// }, 15000);
+setInterval(async () => {
+	try {
+		const users = await participants.find().toArray();
+		const removeUsers = users.filter((p) => Date.now() - p.lastStatus >= 10000);
+		for (const e of removeUsers) {
+			const id = e._id;
+			await participants.deleteOne({ _id: id });
+			const message = {
+				from: e.name,
+				to: 'Todos',
+				text: 'sai da sala...',
+				type: 'status',
+				time: dayjs().format('HH:mm:ss'),
+			};
+			await messages.insertOne(message);
+		}
+	} catch (err) {
+		res.status(500).send({ message: err.message });
+	}
+}, 15000);
 
 app.delete('/messages/:id', async (req, res) => {
 	try {
