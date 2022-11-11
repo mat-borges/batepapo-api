@@ -19,108 +19,125 @@ let participants;
 let messages;
 const cleanStringData = (string) => stripHtml(string).result.trim();
 
+// start mongo
 try {
 	await mongoClient.connect();
 	db = mongoClient.db('batepapoUolApi');
 	participants = db.collection('participants');
 	messages = db.collection('messages');
 } catch (err) {
-	console.log(err);
+	res.status(500).send({ message: err.message });
 }
 
+// Joi Schemas
 const messageSchema = Joi.object({
-	from: Joi.string(),
-	to: Joi.string().min(1),
-	text: Joi.string().min(1),
-	type: Joi.string().valid('message', 'private-message'),
-	time: Joi.string(),
+	from: Joi.string().required(),
+	to: Joi.string().required(),
+	text: Joi.string().required(),
+	type: Joi.string().valid('message', 'private_message').required(),
+	time: Joi.string().required(),
 });
-const participantSchema = Joi.object({ name: Joi.string().alphanum().min(1), lastStatus: Joi.number() });
+const participantSchema = Joi.object({
+	name: Joi.string().required(),
+	lastStatus: Joi.number().required(),
+});
 
+// Routes
 app.post('/participants', async (req, res) => {
-	try {
-		const { name } = req.body;
-		const username = cleanStringData(name);
-
-		const { error, value: user } = participantSchema.validate({
-			name: `${username}`,
+	const username = cleanStringData(req.body.name);
+	const { error, value: user } = participantSchema.validate(
+		{
+			name: username,
 			lastStatus: Date.now(),
-		});
-		if (error) {
-			res.status(422).send(error.message);
+		},
+		{ abortEarly: false }
+	);
+
+	if (error) {
+		const errors = error.details.map((detail) => detail.message);
+		res.status(422).send({ message: errors });
+		return;
+	}
+
+	try {
+		const message = {
+			from: username,
+			to: 'Todos',
+			text: 'entra na sala...',
+			type: 'status',
+			time: dayjs(user.lastStatus).format('HH:mm:ss'),
+		};
+		const participant = await participants.findOne({ name: username });
+
+		if (!participant) {
+			await participants.insertOne(user);
+			await messages.insertOne(message);
+			res.status(201).send({ message: 'User created' });
 		} else {
-			const message = {
-				from: `${username}`,
-				to: 'Todos',
-				text: 'entra na sala...',
-				type: 'status',
-				time: dayjs(user.lastStatus).format('HH:mm:ss'),
-			};
-
-			const participant = await participants.find({ name: username }).toArray();
-
-			if (participant.length === 0) {
-				participants.insertOne(user).then(() => {
-					messages.insertOne(message).then(() => {
-						res.sendStatus(201);
-					});
-				});
-			} else {
-				res.status(409).send('A user with this username already exists');
-			}
+			res.status(409).send({ message: 'A user with this name already exists' });
 		}
 	} catch (err) {
 		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 });
 
 app.get('/participants', async (req, res) => {
 	try {
 		const getParticipants = await participants.find().toArray();
+
+		if (getParticipants.length === 0) {
+			res.status(404).send({ message: 'There are no users online' });
+			return;
+		}
+
 		res.status(200).send(getParticipants);
 	} catch (err) {
 		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 });
 
 app.post('/messages', async (req, res) => {
-	try {
-		const { to, text, type } = req.body;
-		const username = cleanStringData(req.headers.user);
-		const { error, value: message } = messageSchema.validate({
+	const { to, text, type } = req.body;
+	const username = cleanStringData(req.headers.user);
+	const { error, value: message } = messageSchema.validate(
+		{
 			from: username,
 			to: cleanStringData(to),
 			text: cleanStringData(text),
 			type: cleanStringData(type),
-			time: dayjs().format('HH:mm:ss'),
-		});
+			time: cleanStringData(dayjs().format('HH:mm:ss')),
+		},
+		{ abortEarly: false }
+	);
+	if (error) {
+		const errors = error.details.map((detail) => detail.message);
+		res.status(422).send({ message: errors });
+		return;
+	}
 
-		if (error) {
-			res.status(422).send(error.message);
+	try {
+		const participant = await participants.findOne({ name: username });
+		if (!participant) {
+			res.status(422).send({ message: "There's no user with this username" });
 		} else {
-			const participant = await participants.find({ name: username }).toArray();
-			if (participant.length === 0) {
-				res.status(422).send("There's no user with this username");
-			} else {
-				await messages.insertOne(message);
-				res.sendStatus(201);
-			}
+			await messages.insertOne(message);
+			res.status(201).send({ message: 'Message created' });
 		}
 	} catch (err) {
 		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 });
 
 app.get('/messages', async (req, res) => {
+	const limit = parseInt(req.query.limit);
+	const user = cleanStringData(req.headers.user);
 	try {
-		const limit = parseInt(req.query.limit);
-		const user = cleanStringData(req.headers.user);
 		const getMessages = await messages.find().toArray();
 		const userMessages = getMessages.filter((e) => {
-			if (e.to === 'Todos' || e.to === user || e.from === user) {
+			if (e.to === 'Todos' || e.to === user || e.from === user || e.type === 'message') {
 				return true;
 			}
 		});
@@ -132,26 +149,25 @@ app.get('/messages', async (req, res) => {
 		}
 	} catch (err) {
 		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 });
 
 app.post('/status', async (req, res) => {
-	try {
-		const user = cleanStringData(req.headers.user);
-		const participant = await participants.find({ name: user }).toArray();
+	const user = cleanStringData(req.headers.user);
 
-		if (participant.length === 0) {
+	try {
+		const participant = await participants.findOne({ name: user });
+
+		if (!participant) {
 			res.sendStatus(404);
 		} else {
-			const id = participant[0]._id;
-			participants.updateOne({ _id: id }, { $set: { lastStatus: Date.now() } }).then(() => {
-				res.sendStatus(200);
-			});
+			const id = participant._id;
+			await participants.updateOne({ _id: id }, { $set: { lastStatus: Date.now() } });
+			res.sendStatus(200);
 		}
 	} catch (err) {
-		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 });
 
@@ -159,23 +175,20 @@ setInterval(async () => {
 	try {
 		const users = await participants.find().toArray();
 		const removeUsers = users.filter((p) => Date.now() - p.lastStatus >= 10000);
-
-		removeUsers.forEach((e) => {
+		for (const e of removeUsers) {
 			const id = e._id;
-			participants.deleteOne({ _id: id }).then(() => {
-				const message = {
-					from: e.name,
-					to: 'Todos',
-					text: 'sai da sala...',
-					type: 'status',
-					time: dayjs().format('HH:mm:ss'),
-				};
-				messages.insertOne(message);
-			});
-		});
+			await participants.deleteOne({ _id: id });
+			const message = {
+				from: e.name,
+				to: 'Todos',
+				text: 'sai da sala...',
+				type: 'status',
+				time: dayjs().format('HH:mm:ss'),
+			};
+			await messages.insertOne(message);
+		}
 	} catch (err) {
-		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 }, 15000);
 
@@ -183,54 +196,59 @@ app.delete('/messages/:id', async (req, res) => {
 	try {
 		const user = cleanStringData(req.headers.user);
 		const { id } = req.params;
-		const message = await messages.find({ _id: ObjectId(id) }).toArray();
+		const message = await messages.findOne({ _id: new ObjectId(id) });
 
-		if (message.length === 0) {
+		if (!message) {
 			res.sendStatus(404);
-		} else if (message[0].from !== user) {
-			res.sendStatus(401);
+		} else if (message.from !== user) {
+			res.status(401).send({ message: "You can't delete a message you didn't send" });
 		} else {
-			messages.deleteOne({ _id: ObjectId(id) }).then(() => {
-				res.sendStatus(200);
-			});
+			await messages.deleteOne({ _id: new ObjectId(id) });
+			res.status(200).send({ message: 'Message deleted' });
 		}
 	} catch (err) {
-		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 });
 
 app.put('/messages/:id', async (req, res) => {
+	const { to, text, type } = req.body;
+	const { id } = req.params;
+	const user = cleanStringData(req.headers.user);
+
 	try {
-		const { to, text, type } = req.body;
-		const { id } = req.params;
-		const user = cleanStringData(req.headers.user);
-		const { error, value: messageEdit } = messageSchema.validate({ to, text, type });
+		const participant = await participants.findOne({ name: user });
 
-		if (error) {
-			res.status(422).send(error.message);
+		if (!participant) {
+			res.status(422).send({ message: "There's no user with this username" });
 		} else {
-			const participant = await participants.find({ name: user }).toArray();
+			const message = await messages.findOne({ _id: new ObjectId(id) });
 
-			if (participant.length === 0) {
-				res.status(422).send("There's no user with this username");
+			if (!message) {
+				res.sendStatus(404);
+			} else if (message.from !== user) {
+				res.sendStatus(401);
 			} else {
-				const message = await messages.find({ _id: ObjectId(id) }).toArray();
-
-				if (message.length === 0) {
-					res.sendStatus(404);
-				} else if (message[0].from !== user) {
-					res.sendStatus(401);
-				} else {
-					await messages.updateOne({ _id: ObjectId(id) }, { $set: messageEdit });
-					res.sendStatus(200);
+				const { error, value: messageEdit } = messageSchema.validate({
+					from: cleanStringData(message.from),
+					to: cleanStringData(to),
+					text: cleanStringData(text),
+					type: cleanStringData(type),
+					time: cleanStringData(message.time),
+				});
+				if (error) {
+					res.status(422).send({ messsage: error.message });
+					return;
 				}
+
+				await messages.updateOne({ _id: new ObjectId(id) }, { $set: messageEdit });
+				res.status(200).send({ message: 'Message edited' });
 			}
 		}
 	} catch (err) {
-		console.log(err);
-		res.sendStatus(500);
+		res.status(500).send({ message: err.message });
 	}
 });
 
+// Port
 app.listen(process.env.PORT, () => console.log(`Running server on http://localhost:${process.env.PORT}`));
