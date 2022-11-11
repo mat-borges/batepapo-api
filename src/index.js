@@ -21,14 +21,14 @@ const cleanStringData = (string) => stripHtml(string).result.trim();
 
 // Joi Schemas
 const messageSchema = Joi.object({
-	from: Joi.string().required(),
-	to: Joi.string().required(),
+	from: Joi.string().alphanum().required(),
+	to: Joi.string().alphanum().required(),
 	text: Joi.string().required(),
 	type: Joi.string().valid('message', 'private_message').required(),
 	time: Joi.string().required(),
 });
 const participantSchema = Joi.object({
-	name: Joi.string().required(),
+	name: Joi.string().alphanum().required(),
 	lastStatus: Joi.number().required(),
 });
 
@@ -171,26 +171,26 @@ app.post('/status', async (req, res) => {
 	}
 });
 
-setInterval(async () => {
-	try {
-		const users = await participants.find().toArray();
-		const removeUsers = users.filter((p) => Date.now() - p.lastStatus >= 10000);
-		for (const e of removeUsers) {
-			const id = e._id;
-			await participants.deleteOne({ _id: id });
-			const message = {
-				from: e.name,
-				to: 'Todos',
-				text: 'sai da sala...',
-				type: 'status',
-				time: dayjs().format('HH:mm:ss'),
-			};
-			await messages.insertOne(message);
-		}
-	} catch (err) {
-		res.status(500).send({ message: err.message });
-	}
-}, 15000);
+// setInterval(async () => {
+// 	try {
+// 		const users = await participants.find().toArray();
+// 		const removeUsers = users.filter((p) => Date.now() - p.lastStatus >= 10000);
+// 		for (const e of removeUsers) {
+// 			const id = e._id;
+// 			await participants.deleteOne({ _id: id });
+// 			const message = {
+// 				from: e.name,
+// 				to: 'Todos',
+// 				text: 'sai da sala...',
+// 				type: 'status',
+// 				time: dayjs().format('HH:mm:ss'),
+// 			};
+// 			await messages.insertOne(message);
+// 		}
+// 	} catch (err) {
+// 		res.status(500).send({ message: err.message });
+// 	}
+// }, 15000);
 
 app.delete('/messages/:id', async (req, res) => {
 	try {
