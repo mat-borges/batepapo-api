@@ -19,16 +19,6 @@ let participants;
 let messages;
 const cleanStringData = (string) => stripHtml(string).result.trim();
 
-// start mongo
-try {
-	await mongoClient.connect();
-	db = mongoClient.db('batepapoUolApi');
-	participants = db.collection('participants');
-	messages = db.collection('messages');
-} catch (err) {
-	res.status(500).send({ message: err.message });
-}
-
 // Joi Schemas
 const messageSchema = Joi.object({
 	from: Joi.string().required(),
@@ -41,6 +31,16 @@ const participantSchema = Joi.object({
 	name: Joi.string().required(),
 	lastStatus: Joi.number().required(),
 });
+
+// start mongo
+try {
+	await mongoClient.connect();
+	db = mongoClient.db('batepapoUolApi');
+	participants = db.collection('participants');
+	messages = db.collection('messages');
+} catch (err) {
+	res.status(500).send({ message: err.message });
+}
 
 // Routes
 app.post('/participants', async (req, res) => {
