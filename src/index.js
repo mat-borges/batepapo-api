@@ -39,7 +39,7 @@ try {
 	participants = db.collection('participants');
 	messages = db.collection('messages');
 } catch (err) {
-	res.status(500).send({ message: err.message });
+	console.log(err);
 }
 
 // Routes
@@ -87,8 +87,7 @@ app.get('/participants', async (req, res) => {
 		const getParticipants = await participants.find().toArray();
 
 		if (getParticipants.length === 0) {
-			res.status(404).send({ message: 'There are no users online' });
-			return;
+			return res.status(404).send({ message: 'There are no users online' });
 		}
 
 		res.status(200).send(getParticipants);
