@@ -55,8 +55,7 @@ app.post('/participants', async (req, res) => {
 
 	if (error) {
 		const errors = error.details.map((detail) => detail.message);
-		res.status(422).send({ message: errors });
-		return;
+		return res.status(422).send({ message: errors });
 	}
 
 	try {
@@ -112,18 +111,17 @@ app.post('/messages', async (req, res) => {
 	);
 	if (error) {
 		const errors = error.details.map((detail) => detail.message);
-		res.status(422).send({ message: errors });
-		return;
+		return res.status(422).send({ message: errors });
 	}
 
 	try {
 		const participant = await participants.findOne({ name: username });
 		if (!participant) {
-			res.status(422).send({ message: "There's no user with this username" });
-		} else {
-			await messages.insertOne(message);
-			res.status(201).send({ message: 'Message created' });
+			return res.status(422).send({ message: "There's no user with this username" });
 		}
+
+		await messages.insertOne(message);
+		res.status(201).send({ message: 'Message created' });
 	} catch (err) {
 		console.log(err);
 		res.status(500).send({ message: err.message });
@@ -161,12 +159,12 @@ app.post('/status', async (req, res) => {
 		const participant = await participants.findOne({ name: user });
 
 		if (!participant) {
-			res.sendStatus(404);
-		} else {
-			const id = participant._id;
-			await participants.updateOne({ _id: id }, { $set: { lastStatus: Date.now() } });
-			res.sendStatus(200);
+			return res.sendStatus(404);
 		}
+
+		const id = participant._id;
+		await participants.updateOne({ _id: id }, { $set: { lastStatus: Date.now() } });
+		res.sendStatus(200);
 	} catch (err) {
 		res.status(500).send({ message: err.message });
 	}
@@ -200,13 +198,13 @@ app.delete('/messages/:id', async (req, res) => {
 		const message = await messages.findOne({ _id: new ObjectId(id) });
 
 		if (!message) {
-			res.sendStatus(404);
+			return res.sendStatus(404);
 		} else if (message.from !== user) {
-			res.status(401).send({ message: "You can't delete a message you didn't send" });
-		} else {
-			await messages.deleteOne({ _id: new ObjectId(id) });
-			res.status(200).send({ message: 'Message deleted' });
+			return res.status(401).send({ message: "You can't delete a message you didn't send" });
 		}
+
+		await messages.deleteOne({ _id: new ObjectId(id) });
+		res.status(200).send({ message: 'Message deleted' });
 	} catch (err) {
 		res.status(500).send({ message: err.message });
 	}
@@ -221,31 +219,30 @@ app.put('/messages/:id', async (req, res) => {
 		const participant = await participants.findOne({ name: user });
 
 		if (!participant) {
-			res.status(422).send({ message: "There's no user with this username" });
-		} else {
-			const message = await messages.findOne({ _id: new ObjectId(id) });
-
-			if (!message) {
-				res.sendStatus(404);
-			} else if (message.from !== user) {
-				res.sendStatus(401);
-			} else {
-				const { error, value: messageEdit } = messageSchema.validate({
-					from: cleanStringData(message.from),
-					to: cleanStringData(to),
-					text: cleanStringData(text),
-					type: cleanStringData(type),
-					time: cleanStringData(message.time),
-				});
-				if (error) {
-					res.status(422).send({ messsage: error.message });
-					return;
-				}
-
-				await messages.updateOne({ _id: new ObjectId(id) }, { $set: messageEdit });
-				res.status(200).send({ message: 'Message edited' });
-			}
+			return res.status(422).send({ message: "There's no user with this username" });
 		}
+
+		const message = await messages.findOne({ _id: new ObjectId(id) });
+
+		if (!message) {
+			return res.sendStatus(404);
+		} else if (message.from !== user) {
+			return res.sendStatus(401);
+		}
+
+		const { error, value: messageEdit } = messageSchema.validate({
+			from: cleanStringData(message.from),
+			to: cleanStringData(to),
+			text: cleanStringData(text),
+			type: cleanStringData(type),
+			time: cleanStringData(message.time),
+		});
+
+		if (error) {
+			return res.status(422).send({ messsage: error.message });
+		}
+		await messages.updateOne({ _id: new ObjectId(id) }, { $set: messageEdit });
+		res.status(200).send({ message: 'Message edited' });
 	} catch (err) {
 		res.status(500).send({ message: err.message });
 	}
